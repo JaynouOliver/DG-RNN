@@ -5,7 +5,8 @@ __author__ = "Changchang.Yin"
 
 
 import sys
-reload(sys)
+import importlib
+importlib.reload(sys)
 sys.setdefaultencoding('utf8')
 
 import os
@@ -25,8 +26,8 @@ from torch.backends import cudnn
 from torch.nn import DataParallel
 from torch.utils.data import DataLoader
 
-import data_loader
-import model
+from . import data_loader
+from . import model
 
 sys.path.append('../tools')
 import parse, py_op
@@ -49,7 +50,7 @@ if torch.cuda.is_available():
     args.gpu = 1
 else:
     args.gpu = 0
-print 'epochs,', args.epochs
+print('epochs,', args.epochs)
 
 def _cuda(tensor, is_tensor=True):
     if args.gpu:
@@ -86,14 +87,14 @@ def print_contributions(contributions):
                 x = str(x)
                 while(len(x) < 3):
                     x = ' '+x
-                print x,
-            print
+                print(x, end=' ')
+            print()
 
 def analyse_contributions(labels, contributions, raw_data):
     cui_con_dict = { }
     # py_op.myreadjson('../result/cui_con_dict.json')
 
-    print labels.shape, contributions.shape, raw_data.shape
+    print(labels.shape, contributions.shape, raw_data.shape)
     # print err
 
     pos_labels = labels[labels>0.5]
@@ -117,14 +118,14 @@ def analyse_contributions(labels, contributions, raw_data):
     id_name_dict = py_op.myreadjson(os.path.join(args.file_dir, 'id_name_dict.json'))
     ehr_cui_dict = py_op.myreadjson(os.path.join(args.file_dir, 'ehr_cui_dict.json'))
     cui_distance_dict = py_op.myreadjson(os.path.join(args.file_dir, 'cui_distance_dict.json'))
-    name_id_dict = { v:ehr_cui_dict.get(k, k) for k,v in id_name_dict.items() }
+    name_id_dict = { v:ehr_cui_dict.get(k, k) for k,v in list(id_name_dict.items()) }
     name_ratio_dict = { }
     for b_ration, b_idx in zip(pos_ratio, pos_data):
         idx_ratio = dict()
         for ratio, idx in zip(b_ration, b_idx):
             idx_ratio[idx] = idx_ratio.get(idx, 0) + ratio
 
-        for idx, ratio in idx_ratio.items():
+        for idx, ratio in list(idx_ratio.items()):
             id = args.vocab[idx]
             id = str(id)
             if idx>0 and id in id_name_dict:
@@ -138,17 +139,17 @@ def analyse_contributions(labels, contributions, raw_data):
     contributions_list = []
 
     name_score_dict = { }
-    for n,v in name_ratio_dict.items():
+    for n,v in list(name_ratio_dict.items()):
         if len(v) > 4:
             name_score_dict[n] = np.mean(v)
-    name_list = sorted(name_score_dict.keys(), key=lambda n:- name_score_dict[n])
+    name_list = sorted(list(name_score_dict.keys()), key=lambda n:- name_score_dict[n])
     for name in name_list[:30]:
         # if name_id_dict[name] in cui_distance_dict:
         #     print 'contribution rate: {:3.2f}%  {:d}    {:s}    {:s}'.format(100 * name_score_dict[name], cui_distance_dict.get(name_id_dict[name], -1), name_id_dict[name], name)
         # print name_ratio_dict[name]
-        print 'contribution rate: {:3.4f}%  {:d}    {:s}    {:s}'.format(100 * name_score_dict[name], cui_distance_dict.get(name_id_dict[name], -1), name_id_dict[name], name)
+        print('contribution rate: {:3.4f}%  {:d}    {:s}    {:s}'.format(100 * name_score_dict[name], cui_distance_dict.get(name_id_dict[name], -1), name_id_dict[name], name))
         # contributions_list.append({ 'id': name_id_dict[name], 'contribution': name_score_dict[name] })
-    print '一共{:d}个name'.format(len(name_list))
+    print('一共{:d}个name'.format(len(name_list)))
     return cui_con_dict
 
 
@@ -181,7 +182,7 @@ def test(data_loader, net, loss, epoch, best_auc, phase='valid', cui_con_dict=[]
                 if not os.path.exists(fc_file):
                     np.save(fc_file, fc_weight)
                 if i_p == 0:
-                    print output
+                    print(output)
         contributions.append(con)
         loss_output = loss(output, label)
         outputs = outputs + list(output.data.cpu().numpy().reshape([-1]))
@@ -229,10 +230,10 @@ def test(data_loader, net, loss, epoch, best_auc, phase='valid', cui_con_dict=[]
     auc = metrics.auc(fpr, tpr)
 
 
-    print('%s Epoch %03d ' % (phase, epoch))
-    print 'loss: {:3.4f}'.format(np.mean(loss_list))
-    print 'tpr: {:3.4f}\t tnr: {:3.4f}\t acc: {:3.4f}\t auc: {:3.4f}'.format(results[0]/results[1], results[2]/results[3], (results[0] + results[2])/(results[1] + results[3]), auc), 
-    print('\t tp: %04d/%04d\t tn: %04d/%04d' % (results[0], results[1], results[2], results[3]))
+    print(('%s Epoch %03d ' % (phase, epoch)))
+    print('loss: {:3.4f}'.format(np.mean(loss_list)))
+    print('tpr: {:3.4f}\t tnr: {:3.4f}\t acc: {:3.4f}\t auc: {:3.4f}'.format(results[0]/results[1], results[2]/results[3], (results[0] + results[2])/(results[1] + results[3]), auc), end=' ') 
+    print(('\t tp: %04d/%04d\t tn: %04d/%04d' % (results[0], results[1], results[2], results[3])))
 
 
     if auc > best_auc[0]:
@@ -252,9 +253,9 @@ def test(data_loader, net, loss, epoch, best_auc, phase='valid', cui_con_dict=[]
     # if args.use_xt and auc > 0.9:
     #     contributions = np.concatenate(contributions)
     #     analyse_contributions(labels, contributions, raw_data)
-    print 'best auc\n\t epoch {:d} auc {:3.4f} \t'.format(best_auc[1], best_auc[0])
-    print
-    print
+    print('best auc\n\t epoch {:d} auc {:3.4f} \t'.format(best_auc[1], best_auc[0]))
+    print()
+    print()
     return best_auc, cui_con_dict
 
 def train(data_loader, net, loss, epoch, optimizer, best_auc):
@@ -288,10 +289,10 @@ def train(data_loader, net, loss, epoch, optimizer, best_auc):
             results[i] += loss_output[i+1]
         loss_list.append(loss_output[0].data.cpu().numpy())
 
-    print('Train Epoch %03d (lr %.5f)' % (epoch, lr))
+    print(('Train Epoch %03d (lr %.5f)' % (epoch, lr)))
     # print 'loss: {:3.4f} {:3.4f} {:3.4f}'.format(np.mean(loss_list))
-    print 'loss: {:3.4f} \t'.format(np.mean(loss_list))
-    print 'init    tpr: {:3.4f}\t tnr: {:3.4f} '.format(results[0]/results[1], results[2]/results[3])
+    print('loss: {:3.4f} \t'.format(np.mean(loss_list)))
+    print('init    tpr: {:3.4f}\t tnr: {:3.4f} '.format(results[0]/results[1], results[2]/results[3]))
 
 def main():
     dataset = data_loader.DataBowl(args, phase='train')
@@ -320,7 +321,7 @@ def main():
         for epoch in range(args.epochs):
             train(train_loader, net, loss, epoch, optimizer, best_auc)
             best_auc, cui_con_dict= test(valid_loader, net, loss, epoch, best_auc, 'valid', cui_con_dict)
-            print args.words
+            print(args.words)
 
 
 
@@ -331,7 +332,7 @@ def main():
             py_op.mywritejson(os.path.join(cons_dir,'{:d}.json'.format(num)), cui_con_dict)
             # break
 
-        print 'best auc', best_auc
+        print('best auc', best_auc)
         auc = best_auc[0]
         with open('../result/log.txt', 'a') as f:
             f.write('#model {:s} #auc {:3.4f}\n'.format(args.model, auc))

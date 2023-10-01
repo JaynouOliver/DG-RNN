@@ -30,10 +30,12 @@ import py_op
 
 class DataBowl(Dataset):
     def __init__(self, args, phase='train'):
-        assert (phase == 'train' or phase == 'valid' or phase == 'test', phase == 'DGVis')
+        if phase not in ['train', 'valid', 'test', 'DGVis']:
+            raise ValueError(f"Invalid phase: {phase}")
         self.args = args
         self.phase = phase
-        self.vocab = json.load(open(os.path.join(args.data_dir, args.dataset, args.dataset.lower().replace('json','') + 'vocab.json')))
+        with open(os.path.join(args.data_dir, args.dataset, args.dataset.lower().replace('json','') + 'vocab.json')) as f:
+            self.vocab = json.load(f)
         if phase == 'DGVis':
             self.inputs = json.load(open(os.path.join(args.data_dir, args.dataset, 'test.json')))
         else:
@@ -83,7 +85,7 @@ class DataBowl(Dataset):
 
     def series(self, data, r=0.9):
 
-        keys = sorted(data.keys(), key=lambda k:int(k))
+        keys = sorted(list(data.keys()), key=lambda k:int(k))
         data = [data[k] for k in keys]
 
         new_data = []
@@ -100,7 +102,7 @@ class DataBowl(Dataset):
         if np.random.random() < r:
             new_data = []
             base_r = 0.7
-            days = range(len(data))
+            days = list(range(len(data)))
             for i in sorted(days[: int(1 + (base_r + np.random.random() * (1 - base_r))* len(days))]):
                 new_data.append(data[i])
             data = new_data
@@ -137,7 +139,7 @@ class DataBowl(Dataset):
             n_of_visit = [0 for _ in range(self.seq)] + n_of_visit
 
         elif self.phase == 'train':
-            margin = range(len(index) - self.seq)
+            margin = list(range(len(index) - self.seq))
             np.random.shuffle(margin)
             start = margin[0]
             index = index[start: start + self.seq]
@@ -181,6 +183,6 @@ def collate(batch):
         return batch
     elif isinstance(batch[0], int):
         return torch.LongTensor(batch)
-    elif isinstance(batch[0], collections.Iterable):
-        transposed = zip(*batch)
+    elif isinstance(batch[0], collections.abc.Iterable):
+        transposed = list(zip(*batch))
         return [collate(samples) for samples in transposed]

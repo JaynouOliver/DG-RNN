@@ -32,8 +32,8 @@ sys.path.append('models/tools')
 import parse, py_op
 
 sys.path.append('models/code')
-import model
-import data_loader
+from . import model
+from . import data_loader
 
 
 args = parse.args
@@ -47,7 +47,7 @@ def second_to_date(second):
 
 def _cuda(tensor):
     if args.gpu:
-        return tensor.cuda(async=True)
+        return tensor.cuda()
     else:
         return tensor
 
@@ -88,9 +88,9 @@ def get_data():
 
     aid_second_dict = py_op.myreadjson(os.path.join(args.data_dir, args.dataset, 'aid_second_dict.json'))
 
-    for pid, aid_did_dict in pid_aid_did_dict.items():
+    for pid, aid_did_dict in list(pid_aid_did_dict.items()):
         n = 0 
-        aids = sorted(aid_did_dict.keys(), key=lambda aid:int(aid), reverse=True)
+        aids = sorted(list(aid_did_dict.keys()), key=lambda aid:int(aid), reverse=True)
         for ia, aid in enumerate(aids):
             n += len(aid_did_dict[aid])
             if n > 120:
@@ -109,7 +109,7 @@ def get_data():
         yob = int(demo[2:])
         if pid not in pid_aid_did_dict:
             continue
-        aids = pid_aid_did_dict[pid].keys()
+        aids = list(pid_aid_did_dict[pid].keys())
         year = max([aid_year_dict[aid] for aid in aids])
         age = year - yob
         assert age < 100 and age > 0
@@ -137,7 +137,7 @@ def get_pids_data(pids, pid_aid_did_dict, aid_second_dict, dataset, case_set):
     data_list, mask_list, label_list, visit_list  = [], [], [], []
     for pid in pids:
         aid_did_dict = pid_aid_did_dict[pid]
-        aids = sorted(aid_did_dict.keys(), key=lambda aid: aid_second_dict[aid])
+        aids = sorted(list(aid_did_dict.keys()), key=lambda aid: aid_second_dict[aid])
         max_date = aid_second_dict[aids[-1]]
         date_did_dict = dict()
         if pid in case_set:
@@ -193,7 +193,7 @@ def inference(net, data, mask, label, n_of_visit, vocab_list, pids, pid_aid_did_
         crs = contributions[ipid]
         visits = n_of_visit[ipid]
         vectors = output_vectors[ipid]
-        aids = sorted(pid_aid_did_dict[pid].keys(), key = lambda k:int(k))
+        aids = sorted(list(pid_aid_did_dict[pid].keys()), key = lambda k:int(k))
 
         pid_graph_att_res = [gar[ipid] for gar in graph_att_res]
 
@@ -265,7 +265,7 @@ class DGRNN(object):
                 date: int, admission's time
             vocab_list: diagnosis list
         '''
-        aid_date_dict = { aid: second_to_date(second) for aid, second in self.aid_second_dict.items() }
+        aid_date_dict = { aid: second_to_date(second) for aid, second in list(self.aid_second_dict.items()) }
         vocab_list = []
         for vocab in self.vocab_list:
             if vocab in self.id_name_dict:
@@ -302,24 +302,24 @@ class DGRNN(object):
 
         # pid_aid_did_dict = { k:v for k,v in list(self.pid_aid_did_dict.items())[:10] }
 
-        pids_batch = pid_aid_did_dict.keys()
+        pids_batch = list(pid_aid_did_dict.keys())
         data, mask, label, n_of_visit = get_pids_data(pids_batch, pid_aid_did_dict, \
                 self.aid_second_dict, self.dataset, self.case_set) 
         pid_aid_did_cr_dict, pid_aid_risk_dict, pid_aid_did_att_dict = inference(self.net, data, \
                 mask, label, n_of_visit, self.vocab_list, pids_batch, pid_aid_did_dict, self.graph_dict)
 
         for pid, aids in pid_aid_did_cr_dict.items():
-            for aid, dids in aids.items():
-                for did, cr in dids.items():
+            for aid, dids in list(aids.items()):
+                for did, cr in list(dids.items()):
                     pid_aid_did_cr_dict[pid][aid][did] = [str(x) for x in cr]
 
-        for pid, aids in pid_aid_risk_dict.items():
-            for aid, risk in aids.items():
+        for pid, aids in list(pid_aid_risk_dict.items()):
+            for aid, risk in list(aids.items()):
                 pid_aid_risk_dict[pid][aid] = str(risk)
 
-        for pid, aids in pid_aid_did_att_dict.items():
-            for aid, dids in aids.items():
-                for did, att in dids.items():
+        for pid, aids in list(pid_aid_did_att_dict.items()):
+            for aid, dids in list(aids.items()):
+                for did, att in list(dids.items()):
                     pid_aid_did_att_dict[pid][aid][did] = [str(x) for x in att]
 
         return pid_aid_did_cr_dict, pid_aid_risk_dict, pid_aid_did_att_dict
@@ -327,11 +327,11 @@ class DGRNN(object):
 
     def generate_csv(self):
 
-        print(self.case_set)
+        print((self.case_set))
 
         pids = list(self.pid_aid_did_dict.keys())
         vectors = []
-        for i in tqdm(range(0, len(pids), args.batch_size)):
+        for i in tqdm(list(range(0, len(pids), args.batch_size))):
             pids_batch = pids[i: i+args.batch_size]
             pid_aid_did_dict = { pid: self.pid_aid_did_dict[pid] for pid in pids_batch }
             data, mask, label, n_of_visit = get_pids_data(pids_batch, pid_aid_did_dict, \
